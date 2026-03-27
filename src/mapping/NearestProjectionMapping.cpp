@@ -21,11 +21,12 @@
 #include "utils/assertion.hpp"
 
 namespace precice::mapping {
-
 NearestProjectionMapping::NearestProjectionMapping(
     Constraint constraint,
-    int        dimensions)
-    : BarycentricBaseMapping(constraint, dimensions)
+    int        dimensions,
+    int        nnearest) // Add this comma and line
+    : BarycentricBaseMapping(constraint, dimensions),
+      _nnearest(nnearest) // Add this line to initialize the variable
 {
   if (constraint == CONSISTENT) {
     setInputRequirement(Mapping::MeshRequirement::FULL);
@@ -78,7 +79,9 @@ void NearestProjectionMapping::computeMapping()
   // This safety margin results in a candidate set which forms the base for the
   // local nearest projection and counters the loss of detail due to bounding box generation.
   // @TODO Add a configuration option for this factor
-  constexpr int nnearest = 4;
+  // @TODO: Replace this default value with a value read from the XML configuration.
+// This will allow users to tune the number of nearest primitives for thin meshes.
+int nnearest = _nnearest;
 
   utils::statistics::DistanceAccumulator distanceStatistics;
   std::size_t                            toTriangles{0}, toEdges{0}, toVertices{0};

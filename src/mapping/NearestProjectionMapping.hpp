@@ -13,7 +13,7 @@ namespace precice::mapping {
 class NearestProjectionMapping : public BarycentricBaseMapping {
 public:
   /// Constructor, taking mapping constraint.
-  NearestProjectionMapping(Constraint constraint, int dimensions);
+  NearestProjectionMapping(Constraint constraint, int dimensions, int nnearest = 4);
 
   /// Computes the projections and interpolation relations.
   void computeMapping() final override;
@@ -23,6 +23,7 @@ public:
 
 private:
   logging::Logger _log{"mapping::NearestNeighborProjectionMapping"};
+  int _nnearest;
 };
 
 } // namespace precice::mapping
