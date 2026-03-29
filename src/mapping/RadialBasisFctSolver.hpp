@@ -17,13 +17,20 @@ namespace precice::mapping {
 
 /**
  * This class assembles and solves an RBF system, given an input mesh and an output mesh with relevant vertex IDs.
- * The class uses a dense matrix decomposition in order to decompose the resulting system(s) and a backward substitution
- * in order to solve the system at runtime. The functionality uses Eigen and supports only serial execution. In case
- * the polynomial="separate" option is used, the polynomial system is solved using a QR decomposition.
+ * * @note Design Choice - Matrix Decomposition:
+ * 1. LLT (Cholesky): Used when the Basis Function is strictly positive definite. It is the fastest 
+ * stable decomposition for Symmetric Positive Definite (SPD) matrices.
+ * 2. ColPivHouseholderQR: Used as a robust fallback for functions that are not strictly 
+ * positive definite to ensure numerical stability and handle potentially ill-conditioned systems.
+ * * @note Mathematical Logic:
+ * The solver finds coefficients for the RBF interpolation by solving the system Ax = b. 
+ * If a polynomial is used, it ensures the recovery of constant or linear fields, 
+ * improving the accuracy of the mapping between meshes.
  */
 template <typename RADIAL_BASIS_FUNCTION_T>
 class RadialBasisFctSolver {
 public:
+  /// Chooses LLT (Cholesky) for SPD matrices or QR for stability based on the RBF type
   using DecompositionType = std::conditional_t<RADIAL_BASIS_FUNCTION_T::isStrictlyPositiveDefinite(), Eigen::LLT<Eigen::MatrixXd>, Eigen::ColPivHouseholderQR<Eigen::MatrixXd>>;
   using BASIS_FUNCTION_T  = RADIAL_BASIS_FUNCTION_T;
   /// Default constructor
@@ -348,6 +355,8 @@ RadialBasisFctSolver<RADIAL_BASIS_FUNCTION_T>::RadialBasisFctSolver(RADIAL_BASIS
   std::transform(deadAxis.begin(), deadAxis.end(), activeAxis.begin(), [](const auto ax) { return !ax; });
 
   // First, assemble the interpolation matrix and check the invertability
+  // @note Logic: Selects the decomposition strategy. LLT is preferred for performance 
+  // on SPD matrices, while QR is used for general RBF stability.
   bool decompositionSuccessful = false;
   if constexpr (RADIAL_BASIS_FUNCTION_T::isStrictlyPositiveDefinite()) {
     _decMatrixC             = buildMatrixCLU(basisFunction, inputMesh, inputIDs, activeAxis, polynomial).llt();

@@ -1,3 +1,16 @@
+/**
+ * @brief Implementation of Compositional Coupling Scheme orchestration.
+ *
+ * @note Orchestration Logic:
+ * This class coordinates multiple coupling schemes (Explicit and Implicit) acting 
+ * on the same participant. It ensures that time window sizes are compatible 
+ * (integer multiples) and manages the execution flow.
+ *
+ * @note Convergence & Iteration:
+ * For implicit schemes, this module tracks convergence status. If a scheme hasn't 
+ * converged, explicit schemes are put 'on hold' while the implicit iterations 
+ * continue until the residual condition |data_new - data_old| < tolerance is met.
+ */
 #include <algorithm>
 #include <functional>
 #include <limits>
@@ -508,4 +521,4 @@ ImplicitData CompositionalCouplingScheme::implicitDataToReceive() const
   return {};
 }
 
-} // namespace precice::cplscheme
+

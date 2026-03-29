@@ -43,7 +43,15 @@ public:
    * to no distance between cluster centers (i.e. completely overlapping clusters), 0 to distance of 2 x radius between
    * clusters centers.
    * @param[in] projectToInput if enabled, places the cluster centers at the closest vertex of the input mesh.
-   * See also \ref mapping::impl::createClustering()
+   * See also \ref mapping::impl::createClustering()  
+   * * * @note Algorithm Logic:
+ * This mapping uses a Partition of Unity (PoU) approach to handle large-scale meshes efficiently.
+ * It decomposes the global domain into local 'vertex clusters' to maintain near-linear 
+ * computational complexity O(N).
+ * * @note Mathematical Logic:
+ * The mapping ensures that the global sum of all local weight functions is exactly 1 
+ * (Normalization): \sum \phi_i(x) = 1. This is crucial for maintaining the 
+ * consistency/conservativeness of the data being mapped between participant solvers.
    */
   PartitionOfUnityMapping(
       Mapping::Constraint                   constraint,
