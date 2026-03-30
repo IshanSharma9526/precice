@@ -102,7 +102,7 @@ public:
    * param[out] pair of interpolation and the distance to corresponding vertex/edge/triangle
    *
    */
-  ProjectionMatch findNearestProjection(const Eigen::VectorXd &location, int n);
+ProjectionMatch findNearestProjection(const Eigen::VectorXd &location, int n, bool fullSearch = false);
 
   ProjectionMatch findCellOrProjection(const Eigen::VectorXd &location, int n);
 
@@ -125,10 +125,10 @@ private:
   ProjectionMatch findVertexProjection(const Eigen::VectorXd &location);
 
   /// Find closest edge interpolation element. If cannot be found, it falls back to vertex projection
-  ProjectionMatch findEdgeProjection(const Eigen::VectorXd &location, int n, ProjectionMatch closestVertex);
+  ProjectionMatch findEdgeProjection(const Eigen::VectorXd &location, int n, ProjectionMatch closestVertex, bool fullSearch = false);
 
   /// Find closest face interpolation element. If cannot be found, it falls back to first edge interpolation element, then vertex if necessary
-  ProjectionMatch findTriangleProjection(const Eigen::VectorXd &location, int n, ProjectionMatch closestVertex);
+  ProjectionMatch findTriangleProjection(const Eigen::VectorXd &location, int n, ProjectionMatch closestVertex, bool fullSearch = false);
 };
 
 } // namespace precice::query

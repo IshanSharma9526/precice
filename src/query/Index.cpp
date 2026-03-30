@@ -274,39 +274,30 @@ std::vector<TetrahedronID> Index::getEnclosingTetrahedra(const Eigen::VectorXd &
   return matches;
 }
 
-ProjectionMatch Index::findNearestProjection(const Eigen::VectorXd &location, int n)
+ProjectionMatch Index::findNearestProjection(const Eigen::VectorXd &location, int n, bool fullSearch)
 {
   if (_mesh->getDimensions() == 2) {
-    return findEdgeProjection(location, n, findVertexProjection(location));
+    return findEdgeProjection(location, n, findVertexProjection(location), fullSearch);
   } else {
-    return findTriangleProjection(location, n, findVertexProjection(location));
+    return findTriangleProjection(location, n, findVertexProjection(location), fullSearch);
   }
 }
 
 ProjectionMatch Index::findCellOrProjection(const Eigen::VectorXd &location, int n)
 {
   if (_mesh->getDimensions() == 2) {
-    auto matchedTriangles = getClosestTriangles(location, n);
-    for (const auto &match : matchedTriangles) {
-      auto polation = mapping::Polation(location, _mesh->triangles()[match.index]);
-      if (polation.isInterpolation()) {
-        return {std::move(polation)};
-      }
-    }
-
-    // If no triangle is found, fall-back on NP
+    // 2D mein seedha Nearest Projection par fall-back karein
     return findNearestProjection(location, n);
   } else {
-
-    // Find correct tetra, or fall back to NP
+    // 3D mein pehle Tetrahedra check karein
     auto matchedTetra = getEnclosingTetrahedra(location);
     for (const auto &match : matchedTetra) {
-      // Matches are raw indices, not (indices, distance) pairs
       auto polation = mapping::Polation(location, _mesh->tetrahedra()[match]);
       if (polation.isInterpolation()) {
         return {std::move(polation)};
       }
     }
+    // Agar koi Tetra nahin mila, toh NP par fall-back karein
     return findNearestProjection(location, n);
   }
 }
@@ -317,7 +308,7 @@ ProjectionMatch Index::findVertexProjection(const Eigen::VectorXd &location)
   return {mapping::Polation{location, _mesh->vertex(match.index)}};
 }
 
-ProjectionMatch Index::findEdgeProjection(const Eigen::VectorXd &location, int n, ProjectionMatch closestVertex)
+ProjectionMatch Index::findEdgeProjection(const Eigen::VectorXd &location, int n, ProjectionMatch closestVertex, bool fullSearch)
 {
   std::vector<ProjectionMatch> candidates;
   candidates.reserve(n);
@@ -325,10 +316,12 @@ ProjectionMatch Index::findEdgeProjection(const Eigen::VectorXd &location, int n
     auto polation = mapping::Polation(location, _mesh->edges()[match.index]);
     if (polation.isInterpolation()) {
       candidates.emplace_back(std::move(polation));
+      if (!fullSearch && static_cast<int>(candidates.size()) >= n) {
+        break;
+      }
     }
-  }
+  } // Added missing brace here
 
-  // Could not find edge projection element, fall back to vertex projection
   if (candidates.empty()) {
     return closestVertex;
   }
@@ -341,7 +334,7 @@ ProjectionMatch Index::findEdgeProjection(const Eigen::VectorXd &location, int n
   return *min;
 }
 
-ProjectionMatch Index::findTriangleProjection(const Eigen::VectorXd &location, int n, ProjectionMatch closestVertex)
+ProjectionMatch Index::findTriangleProjection(const Eigen::VectorXd &location, int n, ProjectionMatch closestVertex, bool fullSearch)
 {
   std::vector<ProjectionMatch> candidates;
   candidates.reserve(n);
@@ -349,20 +342,20 @@ ProjectionMatch Index::findTriangleProjection(const Eigen::VectorXd &location, i
     auto polation = mapping::Polation(location, _mesh->triangles()[match.index]);
     if (polation.isInterpolation()) {
       candidates.emplace_back(std::move(polation));
+      if (!fullSearch && static_cast<int>(candidates.size()) >= n) {
+        break;
+      }
     }
-  }
+  } // Added missing brace here
 
-  // Could not find triangle projection element, fall back to edge projection
   if (candidates.empty()) {
-    return findEdgeProjection(location, n, std::move(closestVertex));
+    return findEdgeProjection(location, n, std::move(closestVertex), fullSearch); // Added semicolon
   }
 
-  // Fallback to edge projection if a vertex is closer than the best triangle match
   auto min = std::min_element(candidates.begin(), candidates.end());
   if (min->polation.distance() > closestVertex.polation.distance()) {
-    return findEdgeProjection(location, n, std::move(closestVertex));
+    return findEdgeProjection(location, n, std::move(closestVertex), fullSearch); // Added semicolon
   }
-
   return *min;
 }
 

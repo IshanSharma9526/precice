@@ -277,18 +277,20 @@ private:
    * subtag information.
    */
   ConfiguredMapping createMapping(
-      const std::string &direction,
-      const std::string &type,
-      const std::string &fromMeshName,
-      const std::string &toMeshName,
-      const double       cgRange,
-      const std::string &geoMultiscaleDimension,
-      const std::string &geoMultiscaleType,
-      const std::string &geoMultiscaleAxis,
-      const double      &multiscaleRadius,
-      const std::string &geoMultiscaleProfile,
-      const std::string &geoMultiscaleCrossSection) const;
-
+        const std::string& direction,
+        const std::string& type,
+        const std::string& fromMeshName,
+        const std::string& toMeshName,
+        const double      cgRadius,
+        const std::string& geoMultiscaleDimension,
+        const std::string& geoMultiscaleType,
+        const std::string& geoMultiscaleAxis,
+        const double&     multiscaleRadius,
+        const std::string& geoMultiscaleProfile,
+        const std::string& geoMultiscaleCrossSection,
+        int               nNearest,   // Add this
+        bool              fullSearch  // Add this
+    ) const;
   /**
    * Stores additional information about the requested RBF mapping such as the
    * configured polynomial and the solver type, which is not required for all

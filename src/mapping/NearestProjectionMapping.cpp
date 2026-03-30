@@ -21,12 +21,15 @@
 #include "utils/assertion.hpp"
 
 namespace precice::mapping {
+
 NearestProjectionMapping::NearestProjectionMapping(
     Constraint constraint,
     int        dimensions,
-    int        nnearest) // Add this comma and line
+    int        nnearest,   // Fixed: Added comma
+    bool       fullSearch) 
     : BarycentricBaseMapping(constraint, dimensions),
-      _nnearest(nnearest) // Add this line to initialize the variable
+      _nnearest(nnearest),
+      _fullSearch(fullSearch)
 {
   if (constraint == CONSISTENT) {
     setInputRequirement(Mapping::MeshRequirement::FULL);
@@ -49,39 +52,16 @@ void NearestProjectionMapping::computeMapping()
   const std::string         baseEvent = "map.np.computeMapping.From" + input()->getName() + "To" + output()->getName();
   precice::profiling::Event e(baseEvent, profiling::Synchronize);
 
-  // Setup Direction of Mapping
   mesh::PtrMesh origins, searchSpace;
   if (hasConstraint(CONSERVATIVE)) {
-    PRECICE_DEBUG("Compute conservative mapping");
     origins     = input();
     searchSpace = output();
   } else {
-    PRECICE_DEBUG("Compute consistent mapping");
     origins     = output();
     searchSpace = input();
   }
 
   const auto &fVertices = origins->vertices();
-
-  if (getDimensions() == 2) {
-    PRECICE_WARN_IF(!fVertices.empty() && searchSpace->edges().empty(),
-                    "2D Mesh \"{}\" does not contain edges. "
-                    "Nearest projection mapping falls back to nearest neighbor mapping.",
-                    searchSpace->getName());
-  } else {
-    PRECICE_WARN_IF(!fVertices.empty() && searchSpace->triangles().empty(),
-                    "3D Mesh \"{}\" does not contain triangles. "
-                    "Nearest projection mapping will map to primitives of lower dimension.",
-                    searchSpace->getName());
-  }
-
-  // Amount of nearest elements to fetch for detailed comparison.
-  // This safety margin results in a candidate set which forms the base for the
-  // local nearest projection and counters the loss of detail due to bounding box generation.
-  // @TODO Add a configuration option for this factor
-  // @TODO: Replace this default value with a value read from the XML configuration.
-// This will allow users to tune the number of nearest primitives for thin meshes.
-int nnearest = _nnearest;
 
   utils::statistics::DistanceAccumulator distanceStatistics;
   std::size_t                            toTriangles{0}, toEdges{0}, toVertices{0};
@@ -91,9 +71,9 @@ int nnearest = _nnearest;
 
   auto &index = searchSpace->index();
   for (const auto &fVertex : fVertices) {
-    // Nearest projection element is edge for 2d if exists, if not, it is the nearest vertex
-    // Nearest projection element is triangle for 3d if exists, if not the edge and at the worst case it is the nearest vertex
-    auto match = index.findNearestProjection(fVertex.getCoords(), nnearest);
+    // Pass the new _nnearest and _fullSearch variables to the index query
+    auto match = index.findNearestProjection(fVertex.getCoords(), _nnearest, _fullSearch);
+    
     distanceStatistics(match.polation.distance());
     switch (match.polation.nElements()) {
     case 1:
@@ -120,7 +100,6 @@ int nnearest = _nnearest;
   }
 
   postProcessOperations();
-
   _hasComputedMapping = true;
 }
 

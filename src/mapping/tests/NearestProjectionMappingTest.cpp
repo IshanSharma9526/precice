@@ -573,10 +573,14 @@ BOOST_AUTO_TEST_CASE(ScaledConsistentQuery3DFullMesh)
 
 namespace {
 using namespace precice::mesh;
-const Eigen::VectorXd &runNPMapping(mapping::Mapping::Constraint constraint, PtrMesh &inMesh, Eigen::VectorXd *inData, PtrMesh &outMesh, Eigen::VectorXd *outData)
+const Eigen::VectorXd &runNPMapping(mapping::Mapping::Constraint constraint,PtrMesh &inMesh,Eigen::VectorXd *inData,PtrMesh &outMesh,
+  Eigen::VectorXd *outData,
+  int nnearest = 4,      // Added parameter with default value
+  bool fullSearch = false) // Added parameter with default value
 {
   BOOST_REQUIRE(inMesh->getDimensions() == outMesh->getDimensions());
-  precice::mapping::NearestProjectionMapping mapping(constraint, inMesh->getDimensions());
+  // Constructor now passes the nnearest and fullSearch flags
+  precice::mapping::NearestProjectionMapping mapping(constraint, inMesh->getDimensions(), nnearest, fullSearch);
   mapping.setMeshes(inMesh, outMesh);
   BOOST_REQUIRE(mapping.hasComputedMapping() == false);
   mapping.computeMapping();
@@ -658,7 +662,42 @@ BOOST_AUTO_TEST_CASE(PickClosestTriangle)
 
   BOOST_TEST(values(0) == 1.0);
 }
+PRECICE_TEST_SETUP(1_rank)
+BOOST_AUTO_TEST_CASE(ThinMeshFullSearchProof)
+{
+  PRECICE_TEST();
+  using namespace precice::mesh;
+  constexpr int dimensions = 3;
 
+  PtrMesh inMesh(new mesh::Mesh("InMesh", dimensions, testing::nextMeshID()));
+  
+  // Bottom Layer: Triangle at z = 0.0 with data value 100.0
+  auto &vb0 = inMesh->createVertex(Eigen::Vector3d(0, 0, 0));
+  auto &vb1 = inMesh->createVertex(Eigen::Vector3d(2, 0, 0));
+  auto &vb2 = inMesh->createVertex(Eigen::Vector3d(1, 2, 0));
+  makeTriangle(inMesh, vb0, vb1, vb2);
+
+  // Top Layer: Triangle at z = 0.02 with data value 0.0
+  auto &vt0 = inMesh->createVertex(Eigen::Vector3d(0, 0, 0.02));
+  auto &vt1 = inMesh->createVertex(Eigen::Vector3d(2, 0, 0.02));
+  auto &vt2 = inMesh->createVertex(Eigen::Vector3d(1, 2, 0.02));
+  makeTriangle(inMesh, vt0, vt1, vt2);
+
+  // Input Data: Indices 0-2 (Bottom) = 100.0, Indices 3-5 (Top) = 0.0
+  Eigen::VectorXd inValues(6);
+  inValues << 100.0, 100.0, 100.0, 0.0, 0.0, 0.0;
+
+  // Output Mesh: Vertex at z = 0.001 (Closer to Bottom Layer)
+  PtrMesh outMesh(new Mesh("OutMesh", dimensions, testing::nextMeshID()));
+  outMesh->createVertex(Eigen::Vector3d{1, 1, 0.001});
+  Eigen::VectorXd outData = Eigen::VectorXd::Constant(1, 0.0);
+
+  // PROOF: Use fullSearch=true to find the bottom triangle (value 100)
+  runNPMapping(mapping::Mapping::CONSISTENT, inMesh, &inValues, outMesh, &outData, 4, true);
+
+  BOOST_TEST(outData(0) == 100.0);
+  BOOST_TEST_INFO("Full Search correctly identified the closest triangle in a thin mesh scenario.");
+}
 PRECICE_TEST_SETUP(1_rank)
 BOOST_AUTO_TEST_CASE(PreferTriangleOverEdge)
 {

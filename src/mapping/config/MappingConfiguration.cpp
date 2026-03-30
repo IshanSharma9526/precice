@@ -31,7 +31,8 @@
 #include "xml/XMLAttribute.hpp"
 #include "xml/XMLTag.hpp"
 namespace precice::mapping {
-
+const std::string ATTR_N_NEAREST  = "n-nearest";
+const std::string ATTR_FULL_SEARCH = "full-search";
 namespace {
 
 // given a list of subtags and parent tags, this function adds all subtags to all
@@ -214,10 +215,16 @@ MappingConfiguration::MappingConfiguration(
 
   auto attrToMesh = XMLAttribute<std::string>(ATTR_TO, "")
                         .setDocumentation("The mesh to map the data to. The default name is an empty mesh name, which is only valid for a just-in-time mapping (using the API functions \"writeAndMapData\" or \"mapAndReadData\").");
-
   auto attrConstraint = XMLAttribute<std::string>(ATTR_CONSTRAINT)
                             .setDocumentation("Use conservative to conserve the nodal sum of the data over the interface (needed e.g. for force mapping).  Use consistent for normalized quantities such as temperature or pressure. Use scaled-consistent-surface or scaled-consistent-volume for normalized quantities where conservation of integral values (surface or volume) is needed (e.g. velocities when the mass flow rate needs to be conserved). Mesh connectivity is required to use scaled-consistent.")
                             .setOptions({CONSTRAINT_CONSERVATIVE, CONSTRAINT_CONSISTENT, CONSTRAINT_SCALED_CONSISTENT_SURFACE, CONSTRAINT_SCALED_CONSISTENT_VOLUME});
+
+  auto attrNNearest = makeXMLAttribute(ATTR_N_NEAREST, 4)
+                          .setDocumentation("Number of nearest primitives to fetch for detailed comparison. Increasing this can improve robustness on complex or thin meshes.");
+
+  auto attrFullSearch = makeXMLAttribute(ATTR_FULL_SEARCH, false)
+                            .setDocumentation("If enabled, the mapping will perform a full search of all n-nearest primitives instead of short-circuiting after the first valid projection. Required for very thin meshes.");
+ 
   auto attrXDead = makeXMLAttribute(ATTR_X_DEAD, false)
                        .setDocumentation("If set to true, the x axis will be ignored for the mapping");
   auto attrYDead = makeXMLAttribute(ATTR_Y_DEAD, false)
@@ -268,7 +275,7 @@ MappingConfiguration::MappingConfiguration(
                                            .setDefaultValue(GEOMETRIC_MULTISCALE_CROSS_SECTION_CIRCLE);
 
   // Add the relevant attributes to the relevant tags
-  addAttributes(projectionTags, {attrFromMesh, attrToMesh, attrDirection, attrConstraint});
+  addAttributes(projectionTags, {attrFromMesh, attrToMesh, attrDirection, attrConstraint, attrNNearest, attrFullSearch});
   addAttributes(rbfDirectTags, {attrFromMesh, attrToMesh, attrDirection, attrConstraint, attrPolynomial, attrXDead, attrYDead, attrZDead});
   addAttributes(rbfIterativeTags, {attrFromMesh, attrToMesh, attrDirection, attrConstraint, attrPolynomial, attrXDead, attrYDead, attrZDead, attrSolverRtol});
   addAttributes(pumDirectTags, {attrFromMesh, attrToMesh, attrDirection, attrConstraint, attrPumPolynomial, verticesPerCluster, relativeOverlap, projectToInput});
@@ -447,6 +454,10 @@ void MappingConfiguration::xmlTagCallback(
     double      solverRtol    = tag.getDoubleAttributeValue(ATTR_SOLVER_RTOL, 1e-9);
     std::string strPolynomial = tag.getStringAttributeValue(ATTR_POLYNOMIAL, POLYNOMIAL_SEPARATE);
 
+    // n-nearest and full-search related tags
+    int  nNearest   = tag.getIntAttributeValue(ATTR_N_NEAREST, 4);
+    bool fullSearch = tag.getBooleanAttributeValue(ATTR_FULL_SEARCH, false);
+
     // geometric multiscale related tags
     std::string geoMultiscaleDimension    = tag.getStringAttributeValue(ATTR_GEOMETRIC_MULTISCALE_DIMENSION, "");
     std::string geoMultiscaleType         = tag.getStringAttributeValue(ATTR_GEOMETRIC_MULTISCALE_TYPE, "");
@@ -618,7 +629,9 @@ MappingConfiguration::ConfiguredMapping MappingConfiguration::createMapping(
     const std::string &geoMultiscaleAxis,
     const double      &multiscaleRadius,
     const std::string &geoMultiscaleProfile,
-    const std::string &geoMultiscaleCrossSection) const
+    const std::string &geoMultiscaleCrossSection,
+    int                nNearest,    // Add this
+    bool               fullSearch) const // Add this
 {
   PRECICE_TRACE(direction, type);
 
@@ -679,7 +692,7 @@ MappingConfiguration::ConfiguredMapping MappingConfiguration::createMapping(
   if (type == TYPE_NEAREST_NEIGHBOR) {
     configuredMapping.mapping = PtrMapping(new NearestNeighborMapping(constraintValue, fromMesh->getDimensions()));
   } else if (type == TYPE_NEAREST_PROJECTION) {
-    configuredMapping.mapping = PtrMapping(new NearestProjectionMapping(constraintValue, fromMesh->getDimensions()));
+    configuredMapping.mapping = PtrMapping(new NearestProjectionMapping(constraintValue, fromMesh->getDimensions(), nNearest, fullSearch));
   } else if (type == TYPE_LINEAR_CELL_INTERPOLATION) {
     configuredMapping.mapping = PtrMapping(new LinearCellInterpolationMapping(constraintValue, fromMesh->getDimensions()));
   } else if (type == TYPE_COARSE_GRAINING) {

@@ -39,8 +39,11 @@ std::string decodeXML(std::string_view xml)
     }
   };
   return decodedXml;
+<<<<<<< Updated upstream
 }
 
+=======
+>>>>>>> Stashed changes
 // ------------------------- Callback functions for libxml2  -------------------------
 
 void OnStartElementNs(
