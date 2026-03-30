@@ -219,13 +219,22 @@ BOOST_AUTO_TEST_CASE(Decode)
 {
   PRECICE_TEST();
 
+  // Basic entities
   BOOST_TEST(decodeXML("Less than &lt; test") == "Less than < test");
   BOOST_TEST(decodeXML("Greater than &gt; test") == "Greater than > test");
   BOOST_TEST(decodeXML("Ampersand &amp; test") == "Ampersand & test");
   BOOST_TEST(decodeXML("Quotation &quot; test") == "Quotation \" test");
   BOOST_TEST(decodeXML("Apostrophe &apos; test") == "Apostrophe ' test");
 
+  // Multi-entity string
   BOOST_TEST(decodeXML("&quot; &lt; &gt; &gt; &lt; &amp; &quot; &amp; &apos;") == "\" < > > < & \" & '");
+
+  // Single-pass check (Recursive entity resolution requirement)
+  // Our O(N) algorithm should only decode once, so &amp;amp; stays &amp;
+  BOOST_TEST(decodeXML("&amp;amp;") == "&amp;");
+  
+  // Edge case: Incomplete entity
+  BOOST_TEST(decodeXML("This & is just an ampersand") == "This & is just an ampersand");
 }
 
 PRECICE_TEST_SETUP(1_rank)

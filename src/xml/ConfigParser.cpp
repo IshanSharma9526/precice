@@ -24,23 +24,28 @@ namespace precice::xml {
 std::string decodeXML(std::string_view xml)
 {
   static const std::map<std::string_view, char> escapes{{"&lt;", '<'}, {"&gt;", '>'}, {"&amp;", '&'}, {"&quot;", '"'}, {"&apos;", '\''}};
-  std::string                                   decodedXml(xml);
-  while (true) {
-    bool changes{false};
-    for (const auto &kv : escapes) {
-      auto position = decodedXml.find(kv.first);
-      if (position != std::string::npos) {
-        decodedXml.replace(position, kv.first.length(), 1, kv.second);
-        changes = true;
+  
+  std::string decodedXml;
+  // Pre-allocate memory to guarantee O(N) efficiency
+  decodedXml.reserve(xml.size());
+
+  for (size_t i = 0; i < xml.size(); ++i) {
+    if (xml[i] == '&') {
+      size_t semiColonPos = xml.find(';', i);
+      if (semiColonPos != std::string_view::npos) {
+        std::string_view entity = xml.substr(i, semiColonPos - i + 1);
+        auto it = escapes.find(entity);
+        if (it != escapes.end()) {
+          decodedXml += it->second;
+          i = semiColonPos; // Skip the rest of the entity
+          continue;
+        }
       }
     }
-    if (!changes) {
-      break;
-    }
-  };
+    decodedXml += xml[i];
+  }
   return decodedXml;
 }
-
 // ------------------------- Callback functions for libxml2  -------------------------
 
 void OnStartElementNs(
